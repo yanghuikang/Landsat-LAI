@@ -111,6 +111,7 @@ def maskLST(image):
     cloud = getQABits(pixelQA, 1, 1, 'clear')
     return image.updateMask(cloud.eq(1))
 
+
 def getLAIQA(landsat, sensor, lai):
     """
       QA is coded in a byte-size band occupying the least significant 3 bits
@@ -136,10 +137,6 @@ def getLAIQA(landsat, sensor, lai):
     swir1_max = 7100
     lai_max = 8
   
-    # information from the Landsat image
-    # crs = landsat.select('red').projection().crs()
-    # transform = getAffineTransform(landsat.select('red'))
-
     # Get pre-coded convex hull
     data = ee.FeatureCollection('projects/ee-yanghuikang/assets/LAI/LAI_train_convex_hull_by_sensor_v0_1_1')
 
@@ -201,11 +198,9 @@ def getRFModel(sensor, biome):
     Args:
         sensor: str {'LT05', 'LE07', 'LC08'} (cannot be an EE object)
         biome: int
-
-    from 'landsat.py'
     """
 
-    filename = 'projects/ee-yanghuikang/assets/LAI/LAI_train_CONUS_v0_1_1'
+    filename = 'projects/ee-yanghuikang/assets/LAI/LAI_train_sample_CONUS_v0_1_1'
 
     training_coll = ee.FeatureCollection(filename) \
         .filterMetadata('sensor', 'equals', sensor)
@@ -265,22 +260,16 @@ def getTrainImg(image):
 
 
     # Map NLCD codes to biomes
-    # CM - Added NLCD codes 11 and 12
-    # CM - Switched from lists to a dictionary to improve readability
     nlcd_biom_remap = {
         11: 0, 12: 0,
         21: 0, 22: 0, 23: 0, 24: 0, 31: 0,
         41: 1, 42: 2, 43: 3, 52: 4,
         71: 5, 81: 5, 82: 6, 90: 7, 95: 8,
     }
-    # fromList = [21, 22, 23, 24, 31, 41, 42, 43, 52, 71, 81, 82, 90, 95]
-    # toList = [0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 5, 6, 7, 8]
+
     biom_img = nlcd_img.remap(*zip(*nlcd_biom_remap.items()) )
-    # biom_img = nlcd_img.remap(
-    #     list(nlcd_biom_remap.keys()), list(nlcd_biom_remap.values()))
 
     # Add other bands
-
     # CM - Map all bands to mask image to avoid clip or updateMask calls
     mask_img = image.select(['pixel_qa'], ['mask']).multiply(0)
     image = image.addBands(mask_img.add(biom_img).rename(['biome2'])) \
@@ -293,7 +282,6 @@ def getTrainImg(image):
         .addBands(mask_img.float().add(ee.Number(image.get('SOLAR_AZIMUTH_ANGLE')))
                     .rename(['sun_azimuth'])) \
         .addBands(mask_img.add(1))
-
 
     return image
 
@@ -344,11 +332,13 @@ def getLAIImage(image, sensor, nonveg):
     lai_img = lai_img.where(water_mask, 0)
     qa = getLAIQA(train_img,sensor,lai_img)
 
-    lai_img = lai_img.rename('LAI').multiply(100).round().clamp(0,65535).uint16()\
+    scale_factor = 100
+    lai_img = lai_img.rename('LAI').multiply(scale_factor).round().clamp(0,65535).uint16()\
         .addBands(qa.byte())
 
     return ee.Image(lai_img.copyProperties(image)) \
         .set('system:time_start', image.get('system:time_start'))
+        .set('LAI_scale',1/scale_factor)
 
 
 def getLandsat(start, end, path, row):
@@ -454,29 +444,17 @@ def main(argv):
             print('nonveg: '+arg)
             nonveg = int(arg)
 
-    # Set path row
-    # path = int(argv[1])
-    # row = int(argv[2])
-    # start = argv[3]
-    # end = argv[4]
-    # nonveg = int(argv[5])
-
-    # path = 30
-    # row = 36
-    # start = '2015-07-25'
-    # end = '2015-07-26'
     pathrow = str(path).zfill(3)+str(row).zfill(3)
-    # assetDir = 'users/yanghui/OpenET/LAI_US/test_LAI_maps/test_QA/scene_v0_1/'
+    assetDir = assetDir + '/'
     
     # Get Landsat collection
     landsat_coll = getLandsat(start, end, path, row)
     landsat_coll = landsat_coll.sort('system:time_start')
     
+    # Get number of available Landsat (5/7/8) images
     n = landsat_coll.size().getInfo()
     print('Number of Landsat images: ', n)
     sys.stdout.flush()
-    
-    # print(laiColl.limit(10).getInfo())
     
     for i in range(n):
     
@@ -502,12 +480,9 @@ def main(argv):
             .set('lai_version',LAI_version)
         laiImage = ee.Image(laiImage)
     
-        # date = laiImage.get('date')
-        # outname = 'LAI_' + date.getInfo()
-        # print(outname)
         outname = 'LAI_' + sensor + '_' + pathrow + '_' + date
     
-    
+        # Export to Earth Engine asset
         task = ee.batch.Export.image.toAsset(image = laiImage,
                                              description = outname,
                                              assetId = assetDir+outname,

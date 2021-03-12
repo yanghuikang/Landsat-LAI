@@ -5,7 +5,7 @@ This folder includes standalone scripts (Python and Javascript) used to batch ex
 ## Python
 This python3 script allows batch export of LAI images from Landsat surface reflectance images using the [Google Earth Engine python client library](https://developers.google.com/earth-engine/guides/python_install). You will specify the WRS path and row for a Landsat scene, the starting and end date, and an Earth Engine asset directory which you have writing access to. Before using this script, make sure that the Google Earth Engine library is installed.
 
-###Usage
+### Usage
 
 
     python ee_Landsat_LAI_export.py -o <asset_dir> -p <path> -r <row> 
@@ -43,7 +43,7 @@ This python3 script allows batch export of LAI images from Landsat surface refle
                   0: Vegetation (from NLCD scheme)
                   1: Non-vegetation (from NLCD scheme)
        
-###Example
+### Example
 For example, 
 
     python ee_Landsat_LAI_export_v0.1.1.py -o projects/ee-yanghuikang/assets/LAI_test/LAI_test_v0_1_1 -p 44 -r 33 -s 2020-06-01 -e 2020-06-15
