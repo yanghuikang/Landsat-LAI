@@ -282,6 +282,7 @@ def getTrainImg(image):
         .addBands(mask_img.float().add(ee.Number(image.get('SOLAR_AZIMUTH_ANGLE')))
                     .rename(['sun_azimuth'])) \
         .addBands(mask_img.add(1))
+        .set('nlcd_year',nlcd_year)
 
     return image
 
@@ -338,7 +339,9 @@ def getLAIImage(image, sensor, nonveg):
 
     return ee.Image(lai_img.copyProperties(image)) \
         .set('system:time_start', image.get('system:time_start'))
-        .set('LAI_scale',1/scale_factor)
+        .set('LAI_scale_factor',1/scale_factor)
+        .set('LAI_nonveg',nonveg)
+        .set('LAI_NLCD_year',train_img.get('nlcd_year'))
 
 
 def getLandsat(start, end, path, row):
@@ -477,7 +480,7 @@ def main(argv):
         laiImage = laiImage \
             .copyProperties(laiImage) \
             .set('system:time_start',laiImage.get('system:time_start')) \
-            .set('lai_version',LAI_version)
+            .set('LAI_version',LAI_version)
         laiImage = ee.Image(laiImage)
     
         outname = 'LAI_' + sensor + '_' + pathrow + '_' + date
