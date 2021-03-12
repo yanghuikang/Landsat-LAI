@@ -3,10 +3,14 @@ This repository provides code and data to generate Leaf Area Index (LAI) images 
 
 *NOTE: The current version works only within the Contiguous US (CONUS), where all training samples were generated. The algorithm is highly adpatable to other areas and a global version is in the works.*
 
-Citation:
+Access the training dataset here:
+
+
+Reference
 
 Kang et al. (2021) |  citation here
 ------------ | -------------  
+
 
 ## Methodology
 ![](docs/general.png)
@@ -23,10 +27,12 @@ We validated this approach in 19 NEON sites and 8 independent study sites. The o
 
 ## Training data
 ![](docs/training_data_spatial.jpg)
-The entire training set with 1.6 million training samples is available in the ["data"]() folder, along with the convex hull data used to generate the the QA flags. 
+The training set with 1.6 million training samples is available in the ["data"]() folder, along with the convex hull data used to generate the the QA flags. 
+
+A full version of the dataset with more auxilliary information will be available soon.
 
 ## Code
-Python and javascript scripts to export LAI maps for chosen Landsat scene (path/row) over certain time periods. Please find the scripts in the ["standalones"]() folder. The python script is good for batch export of LAI images to a EE asset directory.
+Python and javascript scripts to export LAI maps for chosen Landsat scene (path/row) over certain time periods. Please find the scripts in the ["scripts"]() folder. The python script is good for batch export of LAI images to a EE asset directory.
 
 ## Output format
 The output image contains two bands: a "LAI" band in signed int16 scaled by 100 and a "QA" band with quality flags of input and output range.
@@ -49,6 +55,4 @@ Kang et al. (2021) |  citation here
 Gao et al. (2012) | Gao, F., Anderson, M.C., Kustas, W.P., Wang, Y., 2012. Simple method for retrieving leaf area index from Landsat using MODIS leaf area index products as reference. J. Appl. Remote Sens. 6, 063554. doi:10.1117/1.JRS.6.063554
 Gao et al. (2014) | Gao, F., Anderson, M.C., Kustas, W.P., Houborg, R., 2014. Retrieving Leaf Area Index From Landsat Using MODIS LAI Products and Field Measurements. IEEE Geosci. Remote Sens. Lett. 11, 773–777. doi:10.1109/LGRS.2013.2278782
 
-
-## Acknowledgement
 
