@@ -44,7 +44,7 @@ The output image contains two bands: a "LAI" band in signed int16 scaled by 100 
 
 
 ## References
-  |  Citation
+- |  Citation
 ------------ | ------------- 
 [Kang et al. (2021)](https://www.sciencedirect.com/science/article/pii/S0034425721001012) |  Kang, Y., Ozdogan, M., Gao, F., Anderson, M.C., White, W.A., Yang, Yun, Yang, Yang, Erickson, T.A., 2021. A data-driven approach to estimate leaf area index for Landsat images over the contiguous US. Remote Sens. Environ. 258, 112383. doi:10.1016/j.rse.2021.112383
 [Gao et al. (2012)](https://doi.org/10.1117/1.JRS.6.063554) | Gao, F., Anderson, M.C., Kustas, W.P., Wang, Y., 2012. Simple method for retrieving leaf area index from Landsat using MODIS leaf area index products as reference. J. Appl. Remote Sens. 6, 063554. doi:10.1117/1.JRS.6.063554
