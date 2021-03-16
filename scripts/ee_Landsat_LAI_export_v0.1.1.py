@@ -67,7 +67,7 @@ except ee.EEException:
     ee.Authenticate()
     ee.Initialize()
 
-LAI_version = '0.1.1'
+LAI_version = '0.1.0'
 
 def getAffineTransform(image):
     projection = image.projection()

@@ -38,7 +38,7 @@
  */ 
 
 
-var LAI_version = '0.1.1';
+var LAI_version = '0.1.0';
 
 // Rename Landsat bands
 var renameLandsat = function(image) {
