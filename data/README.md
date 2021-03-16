@@ -10,7 +10,7 @@ On mac or linux, first combine parts into a single zip file.
 
     cat LAI_train_sample_CONUS_v0.1.1_part.* > LAI_train_sample_CONUS_v0.1.1_all.zip
    
-Then unzip the single zip, will result in a 370MB csv file. 
+Then unzip the single zip, and the result will be a 370MB csv file. 
 
     unzip LAI_train_sample_CONUS_v0.1.1_all.zip
 
@@ -23,7 +23,7 @@ The "UID" column encodes the geographic coordiantes (latitude and longitude) and
 * WRS Row: 32
 * Image date: 08/02/2008
 
-These information can uniqely identify a Landsat surface reflectance image and the centroid corresponding to a MODIS LAI pixel.  
+These information can identify a Landsat surface reflectance image and the centroid corresponding to a MODIS LAI pixel.  
 
 The coding for "biome2" is as follows.  
 
