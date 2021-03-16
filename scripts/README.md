@@ -10,7 +10,7 @@ https://code.earthengine.google.com/275f132f46aad52dbf9ef15f3b7c11d2
 A full standalone version:  
 https://code.earthengine.google.com/87ff67124075111c9262af51b2938d5b
 
-You may also download the standalone version: "Landsat\_LAI\_example\_full.js"
+You may also download the standalone version: "Landsat\_LAI\_example\_full.js" within this folder.
 
 ## Python
 This python3 script allows batch export of LAI images from Landsat surface reflectance images using the [Google Earth Engine python client library](https://developers.google.com/earth-engine/guides/python_install). Before running the script, please [install](https://developers.google.com/earth-engine/guides/python_install) the Earth Engine Library if not yet. You will specify the WRS path and row for a Landsat scene, the starting and end date, and an Earth Engine asset directory which you have writing access to. Before using this script, make sure that the Google Earth Engine library is installed.
