@@ -3,8 +3,11 @@ This repository provides code and data to generate Leaf Area Index (LAI) images 
 
 *NOTE: The current version works only within the Contiguous US (CONUS), where training samples were generated. A global version is in the works.*
 
-**Citation**:  
+**Journal Article**:  
 Kang, Y., Ozdogan, M., Gao, F., Anderson, M.C., White, W.A., Yang, Yun, Yang, Yang, Erickson, T.A., 2021. A data-driven approach to estimate leaf area index for Landsat images over the contiguous US. Remote Sens. Environ. 258, 112383. [doi:10.1016/j.rse.2021.112383](https://doi.org/10.1016/j.rse.2021.112383)
+
+**Training Dataset**:  
+Kang, Yanghui; Ozdogan, Mutlu; Gao, Feng; Anderson, Martha C.; White, William A.; Yang, Yun; Yang, Yang; Erickson, Tyler A.. (2021). A dataset of spatiotemporally sampled MODIS Leaf Area Index with corresponding Landsat surface reflectance over the contiguous US. Ag Data Commons. [doi:10.15482/USDA.ADC/1521097](https://doi.org/10.15482/USDA.ADC/1521097).
 
 ## Methodology
 ![](docs/general.png)
@@ -23,7 +26,7 @@ We validated this approach in 19 NEON sites and 8 independent study sites. The o
 ![](docs/training_data_spatial.jpg)
 The training set with 1.6 million training samples is available in the ["data"](https://github.com/yanghuikang/Landsat-LAI/tree/main/data) folder, along with the convex hull data used to generate the the QA flags. 
 
-A full version of the dataset with more auxilliary information will be available soon.
+A full version of the dataset with more auxilliary information is available at [Ag Data Commons](https://doi.org/10.15482/USDA.ADC/1521097).
 
 ## Code
 Python and javascript scripts to export LAI maps for chosen Landsat scene (path/row) over certain time periods. Please find the scripts in the ["scripts"](https://github.com/yanghuikang/Landsat-LAI/tree/main/scripts) folder. The python script is good for batch export of LAI images to a EE asset directory.
@@ -43,7 +46,13 @@ The output image contains two bands: a "LAI" band in signed int16 scaled by 100 
          1: Non-vegetation (from NLCD scheme)
 
 
-## References
+## Aknowledgement
+This approach was built upon previous works by Gao et al. ([2012](https://doi.org/10.1117/1.JRS.6.063554)) and Gao et al. ([2014](https://doi.org/10.1109/LGRS.2013.2278782)), who proposed the original method to train machine learning models for Landsat LAI estimation based on homogeneous MODIS LAI pixels.  
+
+The LAI estimation GEE code was written with the help from Dr. Charles Morton ([website](https://github.com/cgmorton)).  
+
+This research was partly supported by the [OpenET](https://openetdata.org) project. OpenET is dedicated to provide easily accessible high-resolution evapotranspiration (ET) data for improved water management.
+
 _ |  Citation
 ------------ | ------------- 
 [Kang et al. (2021)](https://www.sciencedirect.com/science/article/pii/S0034425721001012) |  Kang, Y., Ozdogan, M., Gao, F., Anderson, M.C., White, W.A., Yang, Yun, Yang, Yang, Erickson, T.A., 2021. A data-driven approach to estimate leaf area index for Landsat images over the contiguous US. Remote Sens. Environ. 258, 112383. doi:10.1016/j.rse.2021.112383

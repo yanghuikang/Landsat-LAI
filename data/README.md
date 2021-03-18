@@ -1,4 +1,7 @@
 ### LAI training data
+**A lite version can be downloaded from this folder with only the essential training data. Please visit [Ag Data Commons](https://doi.org/10.15482/USDA.ADC/1521097) for a full dataset with auxilliary information of each sample.**
+ 
+
 The zip file was split into four parts. Please download all the parts.
 
     LAI_train_sample_CONUS_v0.1.1_part.z01
