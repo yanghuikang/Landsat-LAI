@@ -281,7 +281,7 @@ def getTrainImg(image):
                     .rename(['sun_zenith'])) \
         .addBands(mask_img.float().add(ee.Number(image.get('SOLAR_AZIMUTH_ANGLE')))
                     .rename(['sun_azimuth'])) \
-        .addBands(mask_img.add(1))
+        .addBands(mask_img.add(1)) \
         .set('nlcd_year',nlcd_year)
 
     return image
@@ -338,9 +338,9 @@ def getLAIImage(image, sensor, nonveg):
         .addBands(qa.byte())
 
     return ee.Image(lai_img.copyProperties(image)) \
-        .set('system:time_start', image.get('system:time_start'))
-        .set('LAI_scale_factor',1/scale_factor)
-        .set('LAI_nonveg',nonveg)
+        .set('system:time_start', image.get('system:time_start')) \
+        .set('LAI_scale_factor',1/scale_factor) \
+        .set('LAI_nonveg',nonveg) \
         .set('LAI_NLCD_year',train_img.get('nlcd_year'))
 
 
