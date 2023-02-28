@@ -8,7 +8,7 @@ A lite example:
 https://code.earthengine.google.com/275f132f46aad52dbf9ef15f3b7c11d2
 
 A full standalone version:  
-https://code.earthengine.google.com/87ff67124075111c9262af51b2938d5b
+https://code.earthengine.google.com/c30dfa2ff512af4639188229f92389f5
 
 You may also download the standalone version: "Landsat\_LAI\_example\_full.js" within this folder.
 
