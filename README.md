@@ -1,3 +1,6 @@
+# ALERT：Project update in progress
+<span style="color:#9c0707;">We're currently updating the project to switch to Landsat Collection 2. The current version using Landsat Collection 1 no longer workse. We aim to release a new version in early August, 2024. Meanwhile, feel free to submit issues with any questions or concerns and/or pull requests to suggest useful changes.</span>
+
 # Landsat LAI project
 This repository provides code and data to generate Leaf Area Index (LAI) images at 30-meter resolutions from Landsat data using Google Earth Engine. Using machine learning and a comprehensive training set derived from MODIS LAI/Fpar products ([MCD15A2H v006](https://lpdaac.usgs.gov/products/mcd15a2hv006/)), Landsat Collection 1 Tier 1 [surface reflectance](https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1?qt-science_support_page_related_con=1#qt-science_support_page_related_con), and National Land Cover Dataset ([NLCD](https://www.mrlc.gov)), this approach allows fast generation of LAI maps for any Landsat 5, 7, 8 image using Google Earth Engine. The Landsat LAI estimation is highly consistent with the state-of-the-art MODIS product, enabling downstream applications that operate across scales.
 
