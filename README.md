@@ -1,16 +1,14 @@
-# ALERT：Project update in progress
-<span style="color:#9c0707;">We're currently updating the project to switch to Landsat Collection 2. The current version using Landsat Collection 1 no longer workse. We aim to release a new version in early August, 2024. Meanwhile, feel free to submit issues with any questions or concerns and/or pull requests to suggest useful changes.</span>
-
 # Landsat LAI project
-This repository provides code and data to generate Leaf Area Index (LAI) images at 30-meter resolutions from Landsat data using Google Earth Engine. Using machine learning and a comprehensive training set derived from MODIS LAI/Fpar products ([MCD15A2H v006](https://lpdaac.usgs.gov/products/mcd15a2hv006/)), Landsat Collection 1 Tier 1 [surface reflectance](https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1?qt-science_support_page_related_con=1#qt-science_support_page_related_con), and National Land Cover Dataset ([NLCD](https://www.mrlc.gov)), this approach allows fast generation of LAI maps for any Landsat 5, 7, 8 image using Google Earth Engine. The Landsat LAI estimation is highly consistent with the state-of-the-art MODIS product, enabling downstream applications that operate across scales.
-
-*NOTE: The current version works only within the Contiguous US (CONUS), where training samples were generated. A global version is in the works.*
+This repository provides code and data to generate Leaf Area Index (LAI) images at 30-meter resolutions from Landsat data using Google Earth Engine. Using machine learning and a comprehensive training set derived from MODIS LAI/Fpar products ([MCD15A2H v006](https://lpdaac.usgs.gov/products/mcd15a2hv006/)), Landsat surface reflectance [surface reflectance](https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1?qt-science_support_page_related_con=1#qt-science_support_page_related_con), and National Land Cover Dataset ([NLCD](https://www.mrlc.gov)), this approach allows fast generation of LAI maps for any Landsat 5, 7, 8 image using Google Earth Engine. The Landsat LAI estimation is highly consistent with the state-of-the-art MODIS product, enabling downstream applications that operate across scales.
 
 **Journal Article**:  
 Kang, Y., Ozdogan, M., Gao, F., Anderson, M.C., White, W.A., Yang, Yun, Yang, Yang, Erickson, T.A., 2021. A data-driven approach to estimate leaf area index for Landsat images over the contiguous US. Remote Sens. Environ. 258, 112383. [doi:10.1016/j.rse.2021.112383](https://doi.org/10.1016/j.rse.2021.112383)
 
 **Training Dataset**:  
 Kang, Yanghui; Ozdogan, Mutlu; Gao, Feng; Anderson, Martha C.; White, William A.; Yang, Yun; Yang, Yang; Erickson, Tyler A.. (2021). A dataset of spatiotemporally sampled MODIS Leaf Area Index with corresponding Landsat surface reflectance over the contiguous US. Ag Data Commons. [doi:10.15482/USDA.ADC/1521097](https://doi.org/10.15482/USDA.ADC/1521097).
+
+## Updates
+Jan 2025: the code is updated to use Landsat Collection 2 Level 2 surface reflectance data for Landsat 5, 6, 8, 9. 
 
 ## Methodology
 ![](docs/general.png)
