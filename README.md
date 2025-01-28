@@ -1,5 +1,5 @@
 # Landsat LAI project
-This repository provides code and data to generate Leaf Area Index (LAI) images at 30-meter resolutions from Landsat data using Google Earth Engine. Using machine learning and a comprehensive training set derived from MODIS LAI/Fpar products ([MCD15A2H v006](https://lpdaac.usgs.gov/products/mcd15a2hv006/)), Landsat surface reflectance [surface reflectance](https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1?qt-science_support_page_related_con=1#qt-science_support_page_related_con), and National Land Cover Dataset ([NLCD](https://www.mrlc.gov)), this approach allows fast generation of LAI maps for any Landsat 5, 7, 8 image using Google Earth Engine. The Landsat LAI estimation is highly consistent with the state-of-the-art MODIS product, enabling downstream applications that operate across scales.
+This repository provides code and data to generate Leaf Area Index (LAI) images at 30-meter resolutions from Landsat data using Google Earth Engine. Using machine learning and a comprehensive training set derived from MODIS LAI/Fpar products ([MCD15A2H v006](https://lpdaac.usgs.gov/products/mcd15a2hv006/)), Landsat surface reflectance [surface reflectance](https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1?qt-science_support_page_related_con=1#qt-science_support_page_related_con), and National Land Cover Dataset ([NLCD](https://www.mrlc.gov)), this approach allows fast generation of LAI maps for any Landsat 5, 7, 8, 9 image using Google Earth Engine. The Landsat LAI estimation is highly consistent with the state-of-the-art MODIS product, enabling downstream applications that operate across scales.
 
 **Journal Article**:  
 Kang, Y., Ozdogan, M., Gao, F., Anderson, M.C., White, W.A., Yang, Yun, Yang, Yang, Erickson, T.A., 2021. A data-driven approach to estimate leaf area index for Landsat images over the contiguous US. Remote Sens. Environ. 258, 112383. [doi:10.1016/j.rse.2021.112383](https://doi.org/10.1016/j.rse.2021.112383)
@@ -48,11 +48,13 @@ The output image contains two bands: a "LAI" band in signed int16 scaled by 100 
 
 
 ## Aknowledgement
-This approach was built upon previous works by Gao et al. ([2012](https://doi.org/10.1117/1.JRS.6.063554)) and Gao et al. ([2014](https://doi.org/10.1109/LGRS.2013.2278782)), who proposed the original method to train machine learning models for Landsat LAI estimation based on homogeneous MODIS LAI pixels.  
+* This approach was built upon previous works by Gao et al. ([2012](https://doi.org/10.1117/1.JRS.6.063554)) and Gao et al. ([2014](https://doi.org/10.1109/LGRS.2013.2278782)), who proposed the original method to train machine learning models for Landsat LAI estimation based on homogeneous MODIS LAI pixels.  
 
-The LAI estimation GEE code was written with the help from Dr. Charles Morton ([website](https://github.com/cgmorton)).  
+* The LAI estimation GEE code was written with the help from Dr. Charles Morton ([website](https://github.com/cgmorton)).  
 
-This research was partly supported by the [OpenET](https://openetdata.org) project. OpenET is dedicated to provide easily accessible high-resolution evapotranspiration (ET) data for improved water management.
+* This research was partly supported by the [OpenET](https://openetdata.org) project. OpenET is dedicated to provide easily accessible high-resolution evapotranspiration (ET) data for improved water management.
+
+* The authors sincerely thank Dr. Yijing Liu for sharing their code for adapting the original algorithm to Landsat Collection 2.
 
 _ |  Citation
 ------------ | ------------- 
