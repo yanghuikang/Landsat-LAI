@@ -1,9 +1,10 @@
 /**
  * Github: https://github.com/yanghuikang/Landsat-LAI
  * GEE: https://code.earthengine.google.com/?accept_repo=users/kangyanghui/LAI
- * Link: https://code.earthengine.google.com/87ff67124075111c9262af51b2938d5b
+ * Link: https://code.earthengine.google.com/cbbd5ad7ac5e5ee2815cd0137c8d2585
  *
  * Compute LAI for a Landsat image (full code standalone version)
+ * This algorithm works for Landsat 5, 7, 8, and 9 images
  * 
  * LAI is generated using random forest and a training dataset derived 
  * from MODIS LAI and Landsat Collection 1 surface reflectance
@@ -38,38 +39,113 @@
  */ 
 
 
-var LAI_version = '0.1.0';
+var LAI_version = '0.2.0';
+
+// Prepare Landsat images for the LAI algorithm
+var processLandsat = function(image) {
+  
+  // Step 1: rename landsat bands
+  var renamed_image = renameLandsat(image);
+
+  // Step 2: scale Landsat data (convert Collection 1 band scales to Collection band scales)
+  var rescaled_image = scaleLandsat(renamed_image);
+  // print(rescaled_image);
+  
+  // Step 3: apply cloud mask
+  var masked_image = maskLandsat(rescaled_image);
+  // print(masked_image);
+  
+  // Step 4: compute VIs
+  var final_image = getVIs(masked_image);
+  // print(final_image);
+  
+  // Step 5: add necessary properties
+  var sunElevation = ee.Number(image.get('SUN_ELEVATION'));
+  var sunAzimuth = ee.Number(image.get('SUN_AZIMUTH'));
+  var solarZenith = ee.Algorithms.If(sunElevation,
+    ee.Number(90).subtract(sunElevation),
+    null);
+  final_image = final_image.copyProperties(image).set({
+    'SOLAR_AZIMUTH_ANGLE': sunAzimuth,
+    'SOLAR_ZENITH_ANGLE': solarZenith
+  });
+  
+  return ee.Image(final_image);
+};
+
+// scale Landsat Collection 2 data to match Collection 1 configurations
+// This is because the training dataset was generated with C01 data
+var scaleLandsat = function(image) {
+  return image.select(['green', 'red', 'nir', 'swir1'])
+    .multiply(0.0000275).add(-0.2).divide(0.0001)
+    .addBands(image.select('pixel_qa'));
+};
 
 // Rename Landsat bands
 var renameLandsat = function(image) {
-  var sensor = ee.String(image.get('SATELLITE'));
-  var from = ee.Algorithms.If(sensor.compareTo('LANDSAT_8'),
-                             ['B1','B2','B3','B4','B5','B7','pixel_qa'],
-                             ['B2','B3','B4','B5','B6','B7','pixel_qa']);
+  
+  var spacecraft = ee.String(image.get('SPACECRAFT_ID'));
+  var spacecraft_no  = ee.Number.parse(spacecraft.slice(8,9));
+  var from = ee.Algorithms.If(spacecraft_no.gte(8),
+                             ['SR_B2','SR_B3','SR_B4','SR_B5','SR_B6','SR_B7','QA_PIXEL'],
+                             ['SR_B1','SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','QA_PIXEL']);
   var to = ['blue','green','red','nir','swir1','swir2','pixel_qa'];
 
-  return image.select(from, to);
-};
-
-// Return an image containing just the specified QA bits.
-var getQABits = function(image, start, end, newName) {
-    // Compute the bits we need to extract.
-    var pattern = 0;
-    for (var i = start; i <= end; i++) {
-       pattern += Math.pow(2, i);
-    }
-    // Return a single band image of the extracted QA bits, giving the band
-    // a new name.
-    return image.select([0], [newName])
-                  .bitwiseAnd(pattern)
-                  .rightShift(start);
+  return image.select(from, to).set('SPACECRAFT_NO',spacecraft_no);
 };
 
 // Mask a Landsat image based on the QA band
-var maskLST = function(image) {
+var maskLandsat = function(image) {
   var pixelQA = image.select('pixel_qa');
-  var cloud = getQABits(pixelQA, 1, 1, 'clear');
-  return image.updateMask(cloud.eq(ee.Image(1)));
+  
+  // Return an image containing just the specified QA bits.
+  var getQABits = function(image, start, end, newName) {
+      // Compute the bits we need to extract.
+      var pattern = 0;
+      for (var i = start; i <= end; i++) {
+         pattern += Math.pow(2, i);
+      }
+      // Return a single band image of the extracted QA bits, giving the band
+      // a new name.
+      return image.select([0], [newName])
+                    .bitwiseAnd(pattern)
+                    .rightShift(start);
+  };
+  
+  var cloud = getQABits(pixelQA, 3, 3, 'cloud');
+  var shadow = getQABits(pixelQA, 4, 4, 'shadow');
+  var water = getQABits(pixelQA, 7, 7, 'water');
+  
+  return image.updateMask(cloud.eq(ee.Image(0)))
+    .updateMask(shadow.eq(ee.Image(0)))
+    .updateMask(water.eq(ee.Image(0)));
+};
+
+// Compute VIs for an Landsat image
+var getVIs = function(img) {
+  
+  var SR = img.expression('float(b("nir")) / b("red")');
+  var NDVI = img.expression('float((b("nir") - b("red"))) / (b("nir") + b("red"))');
+  var EVI = img.expression('2.5 * float((b("nir") - b("red"))) / (b("nir") + 6*b("red") - 7.5*float(b("blue")) + 10000)');
+  // var GCI = img.expression('float(b("nir")) / b("green") - 1');
+  // var EVI2 = img.expression('2.5 * float((b("nir") - b("red"))) / (b("nir") + 2.4*float(b("red")) + 10000)');
+  // var OSAVI = img.expression('1.16 * float(b("nir") - b("red")) / (b("nir") + b("red") + 1600)');
+  var NDWI = img.expression('float((b("nir") - b("swir1"))) / (b("nir") + b("swir1"))');
+  // var NDWI2 = img.expression('float((b("nir") - b("swir2"))) / (b("nir") + b("swir2"))');
+  // var MSR = img.expression('float(b("nir")) / b("swir1")');
+  // var MTVI2 = img.expression('1.5*(1.2*float(b("nir") - b("green")) - 2.5*float(b("red") - b("green")))/sqrt((2*b("nir")+10000)*(2*b("nir")+10000) - (6*b("nir") - 5*sqrt(float(b("nir"))))-5000)');
+  
+  return img
+    // .addBands(SR.select([0], ['SR']))
+    .addBands(NDVI.select([0],['NDVI']))
+    //.addBands(EVI.select([0],['EVI']))
+    // .addBands(GCI.select([0],['GCI']))
+    // .addBands(EVI2.select([0],['EVI2']))
+    // .addBands(OSAVI.select([0],['OSAVI']))
+    .addBands(NDWI.select([0],['NDWI']));
+    // .addBands(NDWI2.select([0],['NDWI2']))
+    // .addBands(MSR.select([0],['MSR']))
+    // .addBands(MTVI2.select([0],['MTVI2']));
 };
 
 // Get crs transformation
@@ -158,33 +234,6 @@ var getLAIQA = function(landsat, sensor, lai) {
   return qa_band.rename('QA');
 };
 
-// Compute VIs for an Landsat image
-var getVIs = function(img) {
-  
-  var SR = img.expression('float(b("nir")) / b("red")');
-  var NDVI = img.expression('float((b("nir") - b("red"))) / (b("nir") + b("red"))');
-  var EVI = img.expression('2.5 * float((b("nir") - b("red"))) / (b("nir") + 6*b("red") - 7.5*float(b("blue")) + 10000)');
-  // var GCI = img.expression('float(b("nir")) / b("green") - 1');
-  // var EVI2 = img.expression('2.5 * float((b("nir") - b("red"))) / (b("nir") + 2.4*float(b("red")) + 10000)');
-  // var OSAVI = img.expression('1.16 * float(b("nir") - b("red")) / (b("nir") + b("red") + 1600)');
-  var NDWI = img.expression('float((b("nir") - b("swir1"))) / (b("nir") + b("swir1"))');
-  // var NDWI2 = img.expression('float((b("nir") - b("swir2"))) / (b("nir") + b("swir2"))');
-  // var MSR = img.expression('float(b("nir")) / b("swir1")');
-  // var MTVI2 = img.expression('1.5*(1.2*float(b("nir") - b("green")) - 2.5*float(b("red") - b("green")))/sqrt((2*b("nir")+10000)*(2*b("nir")+10000) - (6*b("nir") - 5*sqrt(float(b("nir"))))-5000)');
-  
-  return img
-    // .addBands(SR.select([0], ['SR']))
-    .addBands(NDVI.select([0],['NDVI']))
-    //.addBands(EVI.select([0],['EVI']))
-    // .addBands(GCI.select([0],['GCI']))
-    // .addBands(EVI2.select([0],['EVI2']))
-    // .addBands(OSAVI.select([0],['OSAVI']))
-    .addBands(NDWI.select([0],['NDWI']));
-    // .addBands(NDWI2.select([0],['NDWI2']))
-    // .addBands(MSR.select([0],['MSR']))
-    // .addBands(MTVI2.select([0],['MTVI2']));
-};
-
 // Prepare feature bands for training
 var getTrainImg = function(image) {
   
@@ -192,29 +241,46 @@ var getTrainImg = function(image) {
   var year = ee.Date(image.get('system:time_start')).get('year').format('%d');
 
   var nlcd_dict = {
-    '1997':'2001','1998':'2001','1999':'2001','2000':'2001','2001':'2001','2002':'2001',
+    '1984':'2001','1985':'2001','1986':'2001','1987':'2001','1988':'2001','1989':'2001',
+    '1990':'2001','1991':'2001','1992':'2001','1993':'2001','1994':'2001','1995':'2001',
+    '1996':'2001','1997':'2001','1998':'2001','1999':'2001','2000':'2001','2001':'2001','2002':'2001',
     '2003':'2004','2004':'2004','2005':'2004',
     '2006':'2006','2007':'2006',
     '2008':'2008','2009':'2008',
     '2010':'2011','2011':'2011','2012':'2011',
     '2013':'2013','2014':'2013',
-    '2015':'2016','2016':'2016','2017':'2016','2018':'2016','2019':'2016','2020':'2016','2021':'2016'};
+    '2015':'2016','2016':'2016','2017':'2016',
+    '2018':'2019','2019':'2019','2020':'2019','2021':'2021','2022':'2021','2023':'2021',
+    '2024':'2021'
+  };
   nlcd_dict = ee.Dictionary(nlcd_dict);
-  var nlcd_year = nlcd_dict.get(year);
-    
-  var nlcd = ee.ImageCollection('USGS/NLCD')
-    .filter(ee.Filter.eq('system:index',ee.String('NLCD').cat(nlcd_year)))
+  var nlcd_year = ee.Number.parse(nlcd_dict.get(year));
+  
+  var getNLCDYear = function(img) {
+    var y = ee.Date(img.get('system:time_start')).get('year');
+    return img.set('year',y);
+  };
+  
+  var nlcd_coll = ee.ImageCollection('USGS/NLCD_RELEASES/2019_REL/NLCD')
+    .merge(ee.ImageCollection('USGS/NLCD_RELEASES/2021_REL/NLCD'))
+    .map(getNLCDYear);
+  // print('nlcd_collection',nlcd_coll);
+  // print('nlcd year',nlcd_year);
+  
+  var nlcd = nlcd_coll
+    .filter(ee.Filter.eq('year',nlcd_year))
     .first();
+  // print('nlcd',nlcd);
   
   var fromList = [11,12,21,22,23,24,31,41,42,43,51,52,71,72,73,74,81,82,90,95];
   var toList = [0,0,0,0,0,0,0,1,2,3,0,4,5,0,0,0,5,6,7,8];
   var biome = ee.Image(nlcd).remap(fromList, toList);
   
-  image = getVIs(image);
+  // Pre-processing Landsat image, rename, rescale, cloud masking
+  image = processLandsat(image);
 
   // add other bands
-  var mask_img = image.select(['pixel_qa'],['mask']).multiply(0);
-  
+  var mask_img = image.select(['pixel_qa'],['mask']).multiply(0); 
   image = image.addBands(biome.rename(['biome2']))
     .addBands(mask_img.add(ee.Image.pixelLonLat()).select(['longitude'],['lon']))
     .addBands(mask_img.add(ee.Image.pixelLonLat()).select(['latitude'],['lat']))
@@ -277,14 +343,14 @@ var getLAIImage = function(image, nonveg) {
   }
   
   // Rename landsat bands
-  image = renameLandsat(image);
-  var sensor_dict = ee.Dictionary({'5':'LT05','7':'LE07','8':'LC08'});
-  var satellite = ee.String(image.get('SATELLITE')).slice(8,9);
+  // image = renameLandsat(image);
+  var sensor_dict = ee.Dictionary({'5':'LT05','7':'LE07','8':'LC08','9':'LC08'});
+  var satellite = ee.String(image.get('SPACECRAFT_ID')).slice(8,9);
   var sensor = sensor_dict.get(satellite);
   
   // Add feature bands to the image
   var train_img = getTrainImg(image);
-  // print(train_img);
+  // print('train_img',train_img);
   
   // LAI for non-vegetative pixels is computed with samples from all biomes
   var biomes = [1,2,3,4,5,6,7,8];
@@ -319,30 +385,30 @@ var getLAIImage = function(image, nonveg) {
 var getLandsat = function(start, end, region, cloud_limit) {
   
   if(cloud_limit === null || cloud_limit === undefined) {
-    cloud_limit = 70;
+    cloud_limit = 30;
   }
   
-  var Landsat8_sr = ee.ImageCollection('LANDSAT/LC08/C01/T1_SR')  // Landsat 8
+  var Landsat9_sr = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')  // Landsat 8
     .filterDate(start, end)
     .filterBounds(region)
-    .filterMetadata('CLOUD_COVER','less_than',cloud_limit)
-    .map(maskLST);
-  // print(Landsat8_sr);
-  
-  var Landsat7_sr = ee.ImageCollection('LANDSAT/LE07/C01/T1_SR')  // Landsat 7
+    .filterMetadata('CLOUD_COVER','less_than',cloud_limit);
+
+  var Landsat8_sr = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')  // Landsat 8
     .filterDate(start, end)
     .filterBounds(region)
-    .filterMetadata('CLOUD_COVER','less_than',cloud_limit)
-    .map(maskLST);
-  // print(Landsat7_sr);
+    .filterMetadata('CLOUD_COVER','less_than',cloud_limit);
   
-  var Landsat5_sr = ee.ImageCollection('LANDSAT/LT05/C01/T1_SR')  // Landsat 7
+  var Landsat7_sr = ee.ImageCollection('LANDSAT/LE07/C02/T1_L2')  // Landsat 7
     .filterDate(start, end)
     .filterBounds(region)
-    .filterMetadata('CLOUD_COVER','less_than',cloud_limit)
-    .map(maskLST);
+    .filterMetadata('CLOUD_COVER','less_than',cloud_limit);
   
-  var Landsat_sr_coll = Landsat8_sr.merge(Landsat7_sr).merge(Landsat5_sr)
+  var Landsat5_sr = ee.ImageCollection('LANDSAT/LT05/C02/T1_L2')  // Landsat 7
+    .filterDate(start, end)
+    .filterBounds(region)
+    .filterMetadata('CLOUD_COVER','less_than',cloud_limit);
+  
+  var Landsat_sr_coll = Landsat9_sr.merge(Landsat8_sr).merge(Landsat7_sr).merge(Landsat5_sr)
     .sort('system:time_start');
 
   return Landsat_sr_coll;
@@ -350,9 +416,9 @@ var getLandsat = function(start, end, region, cloud_limit) {
 
 
 // Set location and dates
-var start = '2020-09-01';
-var end = '2020-09-30';
-var point = ee.Geometry.Point([-120.6200595561732, 37.12351640730834]);
+var start = '1986-08-03';
+var end = '1990-08-30';
+var point = ee.Geometry.Point([-120.62, 37.12]);
 var region = point.buffer(10000).bounds();
 
 // Get Landsat image collection
@@ -370,7 +436,7 @@ var visParam_false = {'min': 1000, 'max': [5000,6000,5000], 'bands': 'swir1,nir,
 var visParam_true = {'min': 0,'max': [2000,2000,2000],'bands':'red,green,blue'};
 var visParam_LAI = {min:0.5,max:5,palette:["caa849","f4e87b","a7cc38","529d3b","248232","145b0b","1e4e18"]};
 
-Map.addLayer(renameLandsat(landsat_image),visParam_false,'Landsat');
+Map.addLayer(processLandsat(landsat_image),visParam_false,'Landsat');
 Map.addLayer(lai_image.select(['LAI']).divide(100),visParam_LAI,'LAI');
 Map.addLayer(lai_image.select(['QA']),{min:0,max:5},'LAI-QA',false);
 Map.addLayer(point,{},'location');

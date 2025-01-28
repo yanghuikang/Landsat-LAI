@@ -3,11 +3,11 @@
 """
 Generate LAI maps Landsat images within the Contiguous US (CONUS)
 
-LAI maps for all Landsat 5, 6, 8 surface reflectance images within a specified time
+LAI maps for all Landsat 5, 6, 8, 9 surface reflectance images within a specified time
 period for a specific path/row will be exported to an Earth Engine asset
 
-NOTE: The algorithm should be applied to Landsat Collection 1 surface reflectance
-images, currently only within CONUS. Work for Landsat 5, 7, and 8.
+NOTE: The algorithm should be applied to Landsat Collection 2 level 2 images, 
+currently only within CONUS. Work for Landsat 5, 7, and 8.
    
 Requirements:
     earthengine-api>=0.1.232
@@ -67,49 +67,150 @@ except ee.EEException:
     ee.Authenticate()
     ee.Initialize()
 
-LAI_version = '0.1.0'
+LAI_version = '0.2.0'
+
+ee.Initialize()
+
+# Function to rename Landsat bands
+def rename_landsat(image):
+    spacecraft = ee.String(image.get('SPACECRAFT_ID'))
+    spacecraft_no = ee.Number.parse(spacecraft.slice(8, 9))
+    from_bands = ee.Algorithms.If(
+        spacecraft_no.gte(8),
+        ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'QA_PIXEL'],
+        ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'QA_PIXEL']
+    )
+    to_bands = ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'pixel_qa']
+    return image.select(from_bands, to_bands).set('SPACECRAFT_NO', spacecraft_no)
+
+# Function to scale Landsat data
+def scale_landsat(image):
+    return image.select(['green', 'red', 'nir', 'swir1']) \
+                .multiply(0.0000275).add(-0.2).divide(0.0001) \
+                .addBands(image.select('pixel_qa'))
+
+# Function to mask Landsat data based on QA band
+def mask_landsat(image):
+    pixelQA = image.select('pixel_qa')
+    def get_qa_bits(img, start, end, new_name):
+        pattern = sum([2**i for i in range(start, end + 1)])
+        return img.select([0], [new_name]).bitwiseAnd(pattern).rightShift(start)
+
+    cloud = get_qa_bits(pixelQA, 3, 3, 'cloud')
+    shadow = get_qa_bits(pixelQA, 4, 4, 'shadow')
+    water = get_qa_bits(pixelQA, 7, 7, 'water')
+    return image.updateMask(cloud.eq(ee.Image(0))) \
+                .updateMask(shadow.eq(ee.Image(0))) \
+                .updateMask(water.eq(ee.Image(0)))
+
+# Function to compute vegetation indices
+def compute_vis(image):
+    NDVI = image.expression(
+        'float((b("nir") - b("red"))) / (b("nir") + b("red"))'
+    )
+    NDWI = image.expression(
+        'float((b("nir") - b("swir1"))) / (b("nir") + b("swir1"))'
+    )
+    return image.addBands(NDVI.rename('NDVI')).addBands(NDWI.rename('NDWI'))
+
+
+# Function to process Landsat images
+def process_landsat(image):
+    renamed_image = rename_landsat(image)
+    rescaled_image = scale_landsat(renamed_image)
+    masked_image = mask_landsat(rescaled_image)
+    final_image = compute_vis(masked_image)
+    sun_elevation = ee.Number(image.get('SUN_ELEVATION'))
+    sun_azimuth = ee.Number(image.get('SUN_AZIMUTH'))
+    solar_zenith = ee.Algorithms.If(
+        sun_elevation,
+        ee.Number(90).subtract(sun_elevation),
+        None
+    )
+    return ee.Image(final_image.copyProperties(image)).set({
+        'SOLAR_AZIMUTH_ANGLE': sun_azimuth,
+        'SOLAR_ZENITH_ANGLE': solar_zenith
+    })
+
+
 
 def getAffineTransform(image):
     projection = image.projection()
     json = ee.Dictionary(ee.Algorithms.Describe(projection))
     return ee.List(json.get('transform'))
 
-def renameLandsat(image):
-    """
-    Function that renames Landsat bands
-    From landsat.
-    """
-    sensor = ee.String(image.get('SATELLITE'))
-    from_list = ee.Algorithms.If(
-        sensor.compareTo('LANDSAT_8'),
-        ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'pixel_qa'],
-        ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'pixel_qa'])
-    to_list = ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'pixel_qa']
 
-    return image.select(from_list, to_list)
-
-
-def getQABits(image, start, end, newName):
+def getTrainImg(image):
     """
-     Function that returns an image containing just the specified QA bits.
+    Takes an Landsat image and prepare feature bands
     """
-    # Compute the bits we need to extract.
-    pattern = 0
-    for i in range(start, end + 1):
-       pattern = pattern + 2**i
 
-    # Return a single band image of the extracted QA bits, giving the band
-    # a new name.
-    return image.select([0],[newName]).bitwiseAnd(pattern).rightShift(start)
+    # Get NLCD for corresponding year
+    nlcd_dict = {
+        '2001': ['1997', '1998', '1999', '2000', '2001', '2002'],
+        '2004': ['2003', '2004', '2005'],
+        '2006': ['2006', '2007'],
+        '2008': ['2008', '2009'],
+        '2011': ['2010', '2011', '2012'],
+        '2013': ['2013', '2014'],
+        '2016': ['2015', '2016', '2017'],
+        '2019': ['2018','2019','2020'],
+        '2021': ['2021','2022','2023','2024','2025']
+    }
+    nlcd_dict = ee.Dictionary({
+        src_year: tgt_year
+        for tgt_year, src_years in nlcd_dict.items()
+        for src_year in src_years})
+
+    nlcd_year = nlcd_dict.get(
+        ee.Date(image.get('system:time_start')).get('year').format('%d'))
+    nlcd_year = ee.Number.parse(nlcd_year)
+
+    # Function to extract the year from the NLCD image
+    def set_nlcd_year(img):
+        y = ee.Date(img.get('system:time_start')).get('year')
+        return img.set('year', y)
+
+    # NLCD collection and filtering
+    nlcd_coll = ee.ImageCollection('USGS/NLCD_RELEASES/2019_REL/NLCD') \
+        .merge(ee.ImageCollection('USGS/NLCD_RELEASES/2021_REL/NLCD')) \
+        .map(set_nlcd_year)
+    nlcd = nlcd_coll.filter(ee.Filter.eq('year', nlcd_year)).first()
 
 
-def maskLST(image):
-    """
-    Function that masks a Landsat image based on the QA band
-    """
-    pixelQA = image.select('pixel_qa')
-    cloud = getQABits(pixelQA, 1, 1, 'clear')
-    return image.updateMask(cloud.eq(1))
+    # Add the NLCD year as a property to track which year was used
+    # image = image.set({'nlcd_year': nlcd_year})
+
+    # Map NLCD codes to biomes
+    nlcd_biom_remap = {
+        11: 0, 12: 0,
+        21: 0, 22: 0, 23: 0, 24: 0, 31: 0,
+        41: 1, 42: 2, 43: 3, 52: 4,
+        71: 5, 81: 5, 82: 6, 90: 7, 95: 8,
+    }
+
+    biom_img = ee.Image(nlcd).remap(*zip(*nlcd_biom_remap.items()) )
+
+    # Pre-process Landsat image: rename, rescale, cloud masking
+    image = process_landsat(image)
+
+
+    # Add other bands
+    # CM - Map all bands to mask image to avoid clip or updateMask calls
+    mask_img = image.select(['pixel_qa'], ['mask']).multiply(0)
+    image = image.addBands(mask_img.add(biom_img).rename(['biome2'])) \
+        .addBands(mask_img.add(ee.Image.pixelLonLat().select(['longitude']))
+                    .rename(['lon'])) \
+        .addBands(mask_img.add(ee.Image.pixelLonLat().select(['latitude']))
+                    .rename(['lat'])) \
+        .addBands(mask_img.float().add(ee.Number(image.get('SOLAR_ZENITH_ANGLE')))
+                    .rename(['sun_zenith'])) \
+        .addBands(mask_img.float().add(ee.Number(image.get('SOLAR_AZIMUTH_ANGLE')))
+                    .rename(['sun_azimuth'])) \
+        .addBands(mask_img.add(1)) \
+        .set('nlcd_year',nlcd_year)
+
+    return image
 
 
 def getLAIQA(landsat, sensor, lai):
@@ -182,16 +283,6 @@ def getLAIQA(landsat, sensor, lai):
     return qa_band.rename('QA')
 
 
-def setDate(image):
-    """
-    Function that adds a "date" property to an image in format "YYYYmmdd"
-    """
-
-    eeDate = ee.Date(image.get('system:time_start'))
-    date = eeDate.format('YYYYMMdd')
-    return image.set('date',date)
-
-
 def getRFModel(sensor, biome):
     """
     Wrapper function to train RF model given biome and sensor
@@ -216,75 +307,6 @@ def getRFModel(sensor, biome):
         .train(features=training_coll,classProperty='MCD_LAI',inputProperties=features)
 
     return rf
-
-
-def getTrainImg(image):
-    """
-    Takes an Landsat image and prepare feature bands
-    """
-
-    # Get NLCD for corresponding year
-    nlcd_dict = {
-        '2001': ['1997', '1998', '1999', '2000', '2001', '2002'],
-        '2004': ['2003', '2004', '2005'],
-        '2006': ['2006', '2007'],
-        '2008': ['2008', '2009'],
-        '2011': ['2010', '2011', '2012'],
-        '2013': ['2013', '2014'],
-        '2016': ['2015', '2016', '2017', '2018', '2019', '2020'],
-    }
-    nlcd_dict = ee.Dictionary({
-        src_year: tgt_year
-        for tgt_year, src_years in nlcd_dict.items()
-        for src_year in src_years})
-    nlcd_year = nlcd_dict.get(
-        ee.Date(image.get('system:time_start')).get('year').format('%d'))
-    nlcd_img = ee.ImageCollection('USGS/NLCD') \
-        .filter(ee.Filter.eq('system:index', ee.String('NLCD').cat(nlcd_year))) \
-        .first()
-
-    # Add the NLCD year as a property to track which year was used
-    image = image.set({'nlcd_year': nlcd_year})
-
-    # Apply fmask
-    image = maskLST(image)
-
-    # Add the vegetation indices as additional bands
-    NDVI = image.expression(
-        'float((b("nir") - b("red"))) / (b("nir") + b("red"))')
-    NDWI = image.expression(
-        'float((b("nir") - b("swir1"))) / (b("nir") + b("swir1"))')
-
-    image = image.addBands(NDVI.select([0], ['NDVI'])) \
-                 .addBands(NDWI.select([0], ['NDWI']))
-
-
-    # Map NLCD codes to biomes
-    nlcd_biom_remap = {
-        11: 0, 12: 0,
-        21: 0, 22: 0, 23: 0, 24: 0, 31: 0,
-        41: 1, 42: 2, 43: 3, 52: 4,
-        71: 5, 81: 5, 82: 6, 90: 7, 95: 8,
-    }
-
-    biom_img = nlcd_img.remap(*zip(*nlcd_biom_remap.items()) )
-
-    # Add other bands
-    # CM - Map all bands to mask image to avoid clip or updateMask calls
-    mask_img = image.select(['pixel_qa'], ['mask']).multiply(0)
-    image = image.addBands(mask_img.add(biom_img).rename(['biome2'])) \
-        .addBands(mask_img.add(ee.Image.pixelLonLat().select(['longitude']))
-                    .rename(['lon'])) \
-        .addBands(mask_img.add(ee.Image.pixelLonLat().select(['latitude']))
-                    .rename(['lat'])) \
-        .addBands(mask_img.float().add(ee.Number(image.get('SOLAR_ZENITH_ANGLE')))
-                    .rename(['sun_zenith'])) \
-        .addBands(mask_img.float().add(ee.Number(image.get('SOLAR_AZIMUTH_ANGLE')))
-                    .rename(['sun_azimuth'])) \
-        .addBands(mask_img.add(1)) \
-        .set('nlcd_year',nlcd_year)
-
-    return image
 
 
 def getLAIforBiome(image, biome, rf_model):
@@ -348,39 +370,34 @@ def getLandsat(start, end, path, row):
     """
     Get Landsat image collection
     """
-    # Landsat 8
-    Landsat8_sr = ee.ImageCollection('LANDSAT/LC08/C01/T1_SR') \
-        .filterDate(start, end) \
-        .filterMetadata('WRS_PATH','equals',path) \
-        .filterMetadata('WRS_ROW','equals',row) \
-        .filterMetadata('CLOUD_COVER','less_than',70) \
-        .select(['B2','B3','B4','B5','B6','B7','pixel_qa'],
-                ['blue','green','red','nir','swir1','swir2','pixel_qa']) \
-        # .map(maskLST)
+    collections = [
+        ee.ImageCollection('LANDSAT/LC09/C02/T1_L2'),
+        ee.ImageCollection('LANDSAT/LC08/C02/T1_L2'),
+        ee.ImageCollection('LANDSAT/LE07/C02/T1_L2'),
+        ee.ImageCollection('LANDSAT/LT05/C02/T1_L2')
+    ]
+
+    def setDate(image):
+        """
+        Function that adds a "date" property to an image in format "YYYYmmdd"
+        """
+        eeDate = ee.Date(image.get('system:time_start'))
+        date = eeDate.format('YYYYMMdd')
+        return image.set('date',date)
+
+    landsat_sr_coll = collections[0]
+    for collection in collections[1:]:
+        landsat_sr_coll = landsat_sr_coll.merge(collection)
+    # print(landsat_sr_coll.first().getInfo())
     
-    # Landsat 7
-    Landsat7_sr = ee.ImageCollection('LANDSAT/LE07/C01/T1_SR')  \
+    landsat_sr_coll = landsat_sr_coll \
         .filterDate(start, end) \
-        .filterMetadata('WRS_PATH','equals',path) \
+        .filter(ee.Filter.lt('CLOUD_COVER',70)) \
+        .filter(ee.Filter.eq('WRS_PATH',path)) \
         .filterMetadata('WRS_ROW','equals',row) \
-        .filterMetadata('CLOUD_COVER','less_than',70) \
-        .select(['B1','B2','B3','B4','B5','B7','pixel_qa'],
-                ['blue','green','red','nir','swir1','swir2','pixel_qa']) \
-        # .map(maskLST)
+        # .map(setDate)
 
-    # Landsat 5  
-    Landsat5_sr = ee.ImageCollection('LANDSAT/LT05/C01/T1_SR') \
-        .filterDate(start, end) \
-        .filterMetadata('WRS_PATH','equals',path) \
-        .filterMetadata('WRS_ROW','equals',row) \
-        .filterMetadata('CLOUD_COVER','less_than',70) \
-        .select(['B1','B2','B3','B4','B5','B7','pixel_qa'],
-                ['blue','green','red','nir','swir1','swir2','pixel_qa']) \
-        # .map(maskLST)
-  
-    Landsat_sr_coll = Landsat8_sr.merge(Landsat5_sr).merge(Landsat7_sr).map(setDate)
-
-    return Landsat_sr_coll
+    return landsat_sr_coll
 
 
 def usage():
@@ -451,10 +468,10 @@ def main(argv):
     assetDir = assetDir + '/'
     
     # Get Landsat collection
-    landsat_coll = getLandsat(start, end, path, row)
+    landsat_coll = getLandsat(start, end, int(path), int(row))
     landsat_coll = landsat_coll.sort('system:time_start')
     
-    # Get number of available Landsat (5/7/8) images
+    # Get number of available Landsat (5/7/8/9) images
     n = landsat_coll.size().getInfo()
     print('Number of Landsat images: ', n)
     sys.stdout.flush()
@@ -467,9 +484,10 @@ def main(argv):
         eedate = ee.Date(landsat_image.get('system:time_start'))
         date = eedate.format('YYYYMMdd').getInfo()
     
-        sensor_dict = {'LANDSAT_5':'LT05','LANDSAT_7':'LE07','LANDSAT_8':'LC08'}
-        sensor = landsat_image.get('SATELLITE').getInfo()
-        sensor = sensor_dict[sensor]
+        # Landsat 9 will use Landsat 8 training set
+        sensor_dict = {'LANDSAT_5':'LT05','LANDSAT_7':'LE07','LANDSAT_8':'LC08','LANDSAT_9':'LC08'}
+        sensor_full = landsat_image.get('SPACECRAFT_ID').getInfo()
+        sensor = sensor_dict[sensor_full]
     
         proj = landsat_image.select([0]).projection().getInfo()
         crs = proj['crs']
@@ -483,7 +501,10 @@ def main(argv):
             .set('LAI_version',LAI_version)
         laiImage = ee.Image(laiImage)
     
-        outname = 'LAI_' + sensor + '_' + pathrow + '_' + date
+        # output name
+        sensor_dict_org = {'LANDSAT_5':'LT05','LANDSAT_7':'LE07','LANDSAT_8':'LC08','LANDSAT_9':'LC09'}
+        sensor_name_org = sensor_dict_org[sensor_full]
+        outname = 'LAI_' + sensor_name_org + '_' + pathrow + '_' + date
     
         # Export to Earth Engine asset
         task = ee.batch.Export.image.toAsset(image = laiImage,
