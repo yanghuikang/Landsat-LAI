@@ -1,0 +1,10 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: Kang
+  given-names: Yanghui
+orcid: https://orcid.org/0000-0001-8563-1503
+title:yanghuikang/Landsat-LAI: Mapping Leaf Area Index from Landsat Images on Google Earth Engine
+version: v1.1.0
+date-released: 2025-02-26
+                                
